@@ -3,6 +3,8 @@ package auth
 import (
 	"context"
 	"errors"
+	"log"
+	"loyaltySys/internal/models"
 	"os"
 	"time"
 
@@ -16,6 +18,9 @@ var TokenAuth *jwtauth.JWTAuth
 func init() {
 	// Get the secret from the environment variables
 	secret := os.Getenv("AUTH_SECRET")
+	if secret == "" {
+		log.Fatal("AUTH_SECRET is not set")
+	}
 	// Create a new JWT authentication middleware
 	TokenAuth = jwtauth.New("HS256", []byte(secret), nil, jwt.WithAcceptableSkew(30*time.Second))
 }
@@ -27,6 +32,7 @@ func GetUserIDFromCtx(ctx context.Context) (int64, error) {
 	// Check if the user ID is in the claims
 	userID, ok := claims["user_id"].(int64)
 	if !ok {
+		log.Println("user_id not found in claims: ", claims)
 		return 0, errors.New("user_id not found in claims")
 	}
 	return userID, nil

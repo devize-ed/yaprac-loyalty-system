@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/jwtauth/v5"
 )
 
+// NewRouter creates a new router for the handler
 func (h *Handler) NewRouter() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger, middleware.Recoverer)
@@ -19,7 +20,7 @@ func (h *Handler) NewRouter() http.Handler {
 			r.Post("/orders", h.CreateOrder())
 			r.Get("/orders", h.GetOrders())
 			r.Get("/balance", h.GetBalance())
-			r.Post("/balance/withdraw", h.WithdrawBalance())
+			r.Post("/balance/withdraw", h.Withdraw())
 			r.Get("/balance/withdrawals", h.GetWithdrawals())
 		})
 		r.Post("/register", h.CreateUser())
