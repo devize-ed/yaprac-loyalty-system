@@ -3,9 +3,11 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"loyaltySys/internal/models"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/go-chi/jwtauth/v5"
@@ -30,12 +32,12 @@ func GetUserIDFromCtx(ctx context.Context) (int64, error) {
 	// Get the JWT token from the context
 	_, claims, _ := jwtauth.FromContext(ctx)
 	// Check if the user ID is in the claims
-	userID, ok := claims["user_id"].(int64)
+	userID, ok := claims["user_id"].(string)
 	if !ok {
 		log.Println("user_id not found in claims: ", claims)
 		return 0, errors.New("user_id not found in claims")
 	}
-	return userID, nil
+	return strconv.ParseInt(userID, 10, 64)
 }
 
 // validateUser validates the user.
@@ -73,4 +75,18 @@ func checkLuhn(purportedCC string) bool {
 		sum += digit
 	}
 	return sum%10 == 0
+}
+
+// generateToken generates a new JWT token for the user.
+func GenerateToken(userID int64) (string, error) {
+	claims := map[string]interface{}{
+		"user_id":   strconv.FormatInt(userID, 10),
+		"issued_at": time.Now().Unix(),
+		"exp":       time.Now().Add(time.Hour).Unix(),
+	}
+	_, token, err := TokenAuth.Encode(claims)
+	if err != nil {
+		return "", fmt.Errorf("failed to encode token: %w", err)
+	}
+	return token, nil
 }

@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"loyaltySys/internal/auth"
+	"loyaltySys/internal/handlers/internal/auth"
 	"net/http"
 
 	"github.com/go-chi/chi/middleware"

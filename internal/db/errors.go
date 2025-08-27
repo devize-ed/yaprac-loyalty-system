@@ -34,20 +34,9 @@ func isErrorDuplicate(err error) bool {
 // isUserOrder checks if the order belongs to the user.
 func (db *DB) isUserOrder(ctx context.Context, orderNumber string, userID int64) error {
 	db.logger.Debugf("Checking if order %s is already added by user %d", orderNumber, userID)
-	// Begin a new transaction
-	tx, err := db.pool.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to begin a transaction: %w", err)
-	}
-	defer func() {
-		if err := tx.Rollback(ctx); err != nil && err != pgx.ErrTxClosed {
-			db.logger.Errorf("failed to rollback a transaction: %w", err)
-		}
-	}()
-
 	// Get the user ID of the order
 	var existingUserID int64
-	err = tx.QueryRow(ctx, "SELECT user_id FROM orders WHERE order = $1", orderNumber).Scan(&existingUserID)
+	err := db.pool.QueryRow(ctx, "SELECT user_id FROM orders WHERE order_number = $1", orderNumber).Scan(&existingUserID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrOrderNotFound
@@ -55,15 +44,11 @@ func (db *DB) isUserOrder(ctx context.Context, orderNumber string, userID int64)
 		return fmt.Errorf("failed to get order owner: %w", err)
 	}
 
-	// Commit the transaction
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("failed to commit a transaction: %w", err)
-	}
-
 	// Check if the order belongs to the user
+	db.logger.Debugf("Order %s belongs to user %d", orderNumber, existingUserID)
 	if existingUserID == userID {
-		return ErrOrderAlreadyAdded
+		return ErrOrderAlreadyExists
 	}
 
-	return ErrOrderAlreadyExists
+	return ErrOrderAlreadyAdded
 }
