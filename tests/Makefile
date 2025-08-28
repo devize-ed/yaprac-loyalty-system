@@ -74,6 +74,23 @@ e2e: up run-bg
 clean:
 	rm -rf .tmp .bin	
 
+.PHONY: tests ci tests-local
+
+# Run unit/integration + e2e
+tests: test e2e
+	@echo "All tests passed"
+
+# Full CI run: start DB, run server in bg, run e2e, stop and remove everything
+ci: up run-bg
+	@$(MAKE) test
+	@$(MAKE) e2e
+	@$(MAKE) stop
+	@$(MAKE) down
+
+# If DB and server are already running — only tests (without up/down)
+tests-local:
+	@$(MAKE) test
+	@BASE="http://$(RUN_ADDRESS)" bash ./tests.sh
 
 ######## MANUAL TESTS ########
 .PHONY: t.register t.login t.order t.orders t.balance t.withdraw t.withdrawals

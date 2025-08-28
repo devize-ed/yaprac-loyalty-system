@@ -12,12 +12,14 @@ import (
 	"go.uber.org/zap"
 )
 
+// Server is a struct that contains the HTTP server and the configuration.
 type Server struct {
 	*http.Server
 	cfg    *config.Config
 	logger *zap.SugaredLogger
 }
 
+// NewServer creates a new server with the given configuration, handler, and logger.
 func NewServer(cfg *config.Config, h *handlers.Handler, logger *zap.SugaredLogger) *Server {
 	return &Server{
 		Server: &http.Server{
@@ -29,6 +31,7 @@ func NewServer(cfg *config.Config, h *handlers.Handler, logger *zap.SugaredLogge
 	}
 }
 
+// Start starts the server and listens for incoming requests.
 func (s *Server) Start(ctx context.Context) error {
 	// Start the HTTP server in a goroutine.
 	go func() {

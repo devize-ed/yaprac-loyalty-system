@@ -14,19 +14,27 @@ type Config struct {
 	LogLevel    string `env:"LOG_LEVEL"`              // Log level
 }
 
+// GetConfig applies the following priority: CLI flags > ENV > default
 func GetConfig() (*Config, error) {
-	cfg := &Config{}
-
-	// Parse environment variables
-	if err := env.Parse(cfg); err != nil {
-		return nil, fmt.Errorf("failed to parse config: %v", err)
+	// default config
+	cfg := &Config{
+		Host:        "localhost:8080",
+		DSN:         "host=localhost user=postgres password=postgres dbname=postgres port=5432 sslmode=disable",
+		AccrualAddr: "http://localhost:8081",
+		LogLevel:    "debug",
 	}
 
-	// Override environment variables with command line arguments if provided
-	flag.StringVar(&cfg.Host, "a", "localhost:8080", "server address")
-	flag.StringVar(&cfg.DSN, "d", "host=localhost user=postgres password=postgres dbname=postgres port=5432 sslmode=disable", "database URI")
-	flag.StringVar(&cfg.AccrualAddr, "r", "http://localhost:8081", "accrual system address")
-	flag.StringVar(&cfg.LogLevel, "l", "debug", "log level")
+	// parse config from environment variables
+	if err := env.Parse(cfg); err != nil {
+		return nil, fmt.Errorf("failed to parse config: %w", err)
+	}
+
+	// CLI flags override ENV/default (only if explicitly set)
+	flag.StringVar(&cfg.Host, "a", cfg.Host, "server address")
+	flag.StringVar(&cfg.DSN, "d", cfg.DSN, "database URI")
+	flag.StringVar(&cfg.AccrualAddr, "r", cfg.AccrualAddr, "accrual system address")
+	flag.StringVar(&cfg.LogLevel, "l", cfg.LogLevel, "log level")
 	flag.Parse()
+
 	return cfg, nil
 }

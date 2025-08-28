@@ -21,3 +21,13 @@ vendor/
 # IDEs directories
 .idea
 .vscode
+
+# temp files    
+tests/.temp
+
+# env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local

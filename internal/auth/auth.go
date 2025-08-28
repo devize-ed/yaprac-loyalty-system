@@ -8,23 +8,31 @@ import (
 	"loyaltySys/internal/models"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/go-chi/jwtauth/v5"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
+// tokenOnce is a once.Do for the token auth.
+var tokenOnce sync.Once
+
+// TokenAuth is the JWT authentication middleware.
 var TokenAuth *jwtauth.JWTAuth
 
-// init initializes the JWT authentication TokenAuth.
-func init() {
-	// Get the secret from the environment variables
-	secret := os.Getenv("AUTH_SECRET")
-	if secret == "" {
-		log.Fatal("AUTH_SECRET is not set")
-	}
-	// Create a new JWT authentication middleware
-	TokenAuth = jwtauth.New("HS256", []byte(secret), nil, jwt.WithAcceptableSkew(30*time.Second))
+// InitJWTFromEnv initializes the JWT authentication middleware from the environment variables.
+func InitJWTFromEnv() error {
+	var err error
+	tokenOnce.Do(func() {
+		secret := os.Getenv("AUTH_SECRET")
+		if secret == "" {
+			err = errors.New("AUTH_SECRET is not set")
+			return
+		}
+		TokenAuth = jwtauth.New("HS256", []byte(secret), nil, jwt.WithAcceptableSkew(30*time.Second))
+	})
+	return err
 }
 
 // GetUserIDFromCtx extracts the user ID from the JWT token in the context.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"loyaltySys/internal/auth"
 	"loyaltySys/internal/config"
 	"loyaltySys/internal/handlers"
 	"loyaltySys/internal/logger"
@@ -35,6 +36,11 @@ func run() error {
 	// create a context that listens for OS signals to shut down the server
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Initialize JWT from environment variables
+	if err := auth.InitJWTFromEnv(); err != nil {
+		return fmt.Errorf("failed to initialize JWT: %w", err)
+	}
 
 	// Initialize storage
 	storage := handlers.NewStorage(ctx, cfg.DSN, l.SugaredLogger)

@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"loyaltySys/internal/handlers/internal/auth"
+	"loyaltySys/internal/auth"
 	"net/http"
 
 	"github.com/go-chi/chi/middleware"
@@ -11,9 +11,12 @@ import (
 
 // NewRouter creates a new router for the handler
 func (h *Handler) NewRouter() http.Handler {
+	// Create a new router
 	r := chi.NewRouter()
+	// Use middleware
 	r.Use(middleware.Logger, middleware.Recoverer)
 	r.Route("/api/user", func(r chi.Router) {
+		// Group for authenticated routes
 		r.Group(func(r chi.Router) {
 			r.Use(jwtauth.Verifier(auth.TokenAuth))
 			r.Use(jwtauth.Authenticator(auth.TokenAuth))
@@ -23,6 +26,7 @@ func (h *Handler) NewRouter() http.Handler {
 			r.Post("/balance/withdraw", h.Withdraw())
 			r.Get("/balance/withdrawals", h.GetWithdrawals())
 		})
+		// Routes for unauthenticated users
 		r.Post("/register", h.CreateUser())
 		r.Post("/login", h.LoginUser())
 	})
