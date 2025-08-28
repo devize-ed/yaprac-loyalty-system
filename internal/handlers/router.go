@@ -15,6 +15,7 @@ func (h *Handler) NewRouter() http.Handler {
 	r := chi.NewRouter()
 	// Use middleware
 	r.Use(middleware.Logger, middleware.Recoverer)
+	// Define routes
 	r.Route("/api/user", func(r chi.Router) {
 		// Group for authenticated routes
 		r.Group(func(r chi.Router) {

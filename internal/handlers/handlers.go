@@ -187,16 +187,17 @@ func (h *Handler) CreateOrder() http.HandlerFunc {
 				http.Error(w, "Order already added by another user", http.StatusConflict)
 				return
 				// Check if the order already added by this user - return 200
-			} else if errors.Is(err, db.ErrOrderAlreadyAdded) {
+			} else if errors.Is(err, db.ErrOrderAlreadyExists) {
 				h.logger.Error("order already added by this user: ", err)
 				http.Error(w, "Order already added by this user", http.StatusOK)
 				return
 			}
-			// Return 500 if the order is not created
+			// Return 500
 			h.logger.Error("failed to create order: ", err)
 			http.Error(w, "Failed to create order", http.StatusInternalServerError)
 			return
 		}
+
 		// Return 202 if the order is accepted for processing
 		h.logger.Debug("Order accepted for processing")
 		w.WriteHeader(http.StatusAccepted)

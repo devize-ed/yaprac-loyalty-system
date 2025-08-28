@@ -39,7 +39,7 @@ func (s *Server) Start(ctx context.Context) error {
 		s.logger.Infof("HTTP server listening on %s", s.cfg.Host)
 		if err := s.ListenAndServe(); err != nil &&
 			!errors.Is(err, http.ErrServerClosed) {
-			s.logger.Errorf("listen error: %w", err)
+			s.logger.Fatalf("listen error: %v", err)
 		} else {
 			s.logger.Debug("HTTP server closed")
 		}

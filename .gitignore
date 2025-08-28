@@ -24,6 +24,8 @@ vendor/
 
 # temp files    
 tests/.temp
+.tmp
+.bin
 
 # env files
 .env
