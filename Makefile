@@ -24,7 +24,7 @@ DC := docker compose -p $(PROJECT_NAME)
 PIDFILE := .tmp/server.pid
 
 .PHONY: up migrate down ps logs build run run-bg stop test e2e e2e-keep clean tests ci tests-local status kill-port \
-        t.register t.login t.order t.order-invalid t.orders t.balance t.withdraw t.withdrawals t.auth t.logout
+        t.register t.login t.order t.order-invalid t.orders t.balance t.withdraw t.withdrawals t.auth t.logout mock-gen
 
 ## up: start Postgres and run migrations
 up:
@@ -184,3 +184,6 @@ t.withdraw:
 
 t.withdrawals:
 	@AUTH=$$(cat .tmp/auth.h); curl -i -X GET "$(BASE)/api/user/withdrawals" -H "$$AUTH"
+
+mock-gen:
+	mockery --name=Storage --with-expecter --dir=internal/handlers --output=internal/handlers/mocks --outpkg=mocks
