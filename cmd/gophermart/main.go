@@ -58,8 +58,6 @@ func run() error {
 	// Initialize accrual service
 	accrual := accrual.NewAccrualService(cfg.AccrualConfig.AccrualAddr, accrualStorage, cfg.AccrualConfig, l.SugaredLogger)
 	// Start accrual service
-	if err := accrual.Start(ctx); err != nil {
-		return fmt.Errorf("failed to start accrual service: %w", err)
-	}
+	accrual.Start(ctx)
 	return nil
 }

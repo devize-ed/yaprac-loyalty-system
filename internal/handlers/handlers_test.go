@@ -6,13 +6,11 @@ import (
 	"loyaltySys/internal/models"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"testing"
 
 	"loyaltySys/internal/db"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/jwtauth/v5"
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -37,14 +35,14 @@ func testEnv(t *testing.T) (*httptest.Server, *mocks.Storage, *chi.Mux, *Handler
 }
 
 // Injects a JWT token with the user_id claim into the request context.
-func withUserID(r *http.Request, id int64) *http.Request {
-	token := jwtauth.New("HS256", []byte("test-secret"), nil)
-	claims := map[string]interface{}{"user_id": strconv.FormatInt(id, 10)} // строка!
-	_, signed, _ := token.Encode(claims)
-	parsedToken, _ := token.Decode(signed)
-	ctx := jwtauth.NewContext(r.Context(), parsedToken, nil)
-	return r.WithContext(ctx)
-}
+// func injectUserID(r *http.Request, id int64) *http.Request {
+// 	token := jwtauth.New("HS256", []byte("test-secret"), nil)
+// 	claims := map[string]interface{}{"user_id": strconv.FormatInt(id, 10)} // строка!
+// 	_, signed, _ := token.Encode(claims)
+// 	parsedToken, _ := token.Decode(signed)
+// 	ctx := jwtauth.NewContext(r.Context(), parsedToken, nil)
+// 	return r.WithContext(ctx)
+// }
 
 func TestHandler_CreateUser(t *testing.T) {
 	srv, st, r, h := testEnv(t)

@@ -209,6 +209,10 @@ func (db *DB) Withdraw(ctx context.Context, withdrawal *models.Withdrawal) error
 		}
 	}()
 
+	// lock the rows for the order and the withdrawal of the user
+	db.pool.Exec(ctx, "LOCK TABLE orders IN EXCLUSIVE MODE")
+	db.pool.Exec(ctx, "LOCK TABLE withdrawals IN EXCLUSIVE MODE")
+
 	// Check if the balance is enough
 	balance, err := db.GetBalance(ctx, withdrawal.UserID)
 	if err != nil {
@@ -227,6 +231,10 @@ func (db *DB) Withdraw(ctx context.Context, withdrawal *models.Withdrawal) error
 		}
 		return fmt.Errorf("failed to create a withdrawal: %w", err)
 	}
+
+	// Unlock the rows for the order and the withdrawal of the user
+	db.pool.Exec(ctx, "UNLOCK TABLE orders")
+	db.pool.Exec(ctx, "UNLOCK TABLE withdrawals")
 
 	// Commit the transaction
 	if err := tx.Commit(ctx); err != nil {
@@ -287,7 +295,7 @@ func (db *DB) GetUnprocessedOrders(ctx context.Context) ([]*models.Order, error)
 func (db *DB) UpdateOrder(ctx context.Context, order *models.Order) error {
 	db.logger.Debugf("Updating order %s", order.Number)
 	// Update the order
-	if _, err := db.pool.Exec(ctx, "UPDATE orders SET status = $1, accrual = $2, uploaded_at = $3 WHERE order_number = $4", order.Status, order.Accrual, order.UploadedAt, order.Number); err != nil {
+	if _, err := db.pool.Exec(ctx, "UPDATE orders SET status = $1, accrual = $2, WHERE order_number = $4", order.Status, order.Accrual, order.Number); err != nil {
 		return fmt.Errorf("failed to update an order: %w", err)
 	}
 	return nil
