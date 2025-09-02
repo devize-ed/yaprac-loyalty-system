@@ -23,7 +23,7 @@ type Server struct {
 func NewServer(cfg *config.Config, h *handlers.Handler, logger *zap.SugaredLogger) *Server {
 	return &Server{
 		Server: &http.Server{
-			Addr:    cfg.Host,
+			Addr:    cfg.ServerConfig.Host,
 			Handler: h.NewRouter(),
 		},
 		cfg:    cfg,
@@ -36,7 +36,7 @@ func (s *Server) Start(ctx context.Context) error {
 	// Start the HTTP server in a goroutine.
 	go func() {
 		// Setart the server and listen for incoming requests.
-		s.logger.Infof("HTTP server listening on %s", s.cfg.Host)
+		s.logger.Infof("HTTP server listening on %s", s.cfg.ServerConfig.Host)
 		if err := s.ListenAndServe(); err != nil &&
 			!errors.Is(err, http.ErrServerClosed) {
 			s.logger.Fatalf("listen error: %v", err)

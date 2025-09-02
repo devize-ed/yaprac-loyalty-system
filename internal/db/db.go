@@ -62,6 +62,7 @@ func (db *DB) Close() error {
 	return nil
 }
 
+// -------Methods for http handlers-------
 // CreateUser creates a new user and returns the user ID created by the database.
 func (db *DB) CreateUser(ctx context.Context, user *models.User) (userID int64, err error) {
 	db.logger.Debugf("Creating user %s", user.Login)
@@ -257,4 +258,37 @@ func (db *DB) GetWithdrawals(ctx context.Context, userID int64) ([]*models.Withd
 	}
 
 	return withdrawals, nil
+}
+
+// -------Methods for accrual service-------
+// GetUnprocessedOrders gets the unprocessed orders and returns them.
+func (db *DB) GetUnprocessedOrders(ctx context.Context) ([]*models.Order, error) {
+	db.logger.Debug("Getting unprocessed orders")
+	// Get the unprocessed orders
+	rows, err := db.pool.Query(ctx, "SELECT order_number, status, accrual, uploaded_at FROM orders WHERE status = 'NEW' OR status = 'PROCESSING'")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get unprocessed orders: %w", err)
+	}
+	defer rows.Close()
+
+	orders := []*models.Order{}
+	for rows.Next() {
+		order := &models.Order{}
+		err := rows.Scan(&order.Number, &order.Status, &order.Accrual, &order.UploadedAt)
+		if err != nil {
+			return nil, err
+		}
+		orders = append(orders, order)
+	}
+	return orders, nil
+}
+
+// UpdateOrder updates the order and returns an error if the order is not found.
+func (db *DB) UpdateOrder(ctx context.Context, order *models.Order) error {
+	db.logger.Debugf("Updating order %s", order.Number)
+	// Update the order
+	if _, err := db.pool.Exec(ctx, "UPDATE orders SET status = $1, accrual = $2, uploaded_at = $3 WHERE order_number = $4", order.Status, order.Accrual, order.UploadedAt, order.Number); err != nil {
+		return fmt.Errorf("failed to update an order: %w", err)
+	}
+	return nil
 }

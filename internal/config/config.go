@@ -3,37 +3,58 @@ package config
 import (
 	"flag"
 	"fmt"
+	db "loyaltySys/internal/db/config"
+	accrual "loyaltySys/internal/service/accrual/config"
+	server "loyaltySys/internal/service/server/config"
+	"time"
 
 	"github.com/caarlos0/env"
 )
 
 type Config struct {
-	Host        string `env:"RUN_ADDRESS"`            // Server address
-	DSN         string `env:"DATABASE_URI"`           // Database URI
-	AccrualAddr string `env:"ACCRUAL_SYSTEM_ADDRESS"` // Accrual system address
-	LogLevel    string `env:"LOG_LEVEL"`              // Log level
+	ServerConfig  server.ServerConfig
+	AccrualConfig accrual.AccrualConfig
+	DBConfig      db.DBConfig
+	LogLevel      string `env:"LOG_LEVEL"` // Log level
 }
 
 // GetConfig applies the following priority: CLI flags > ENV > default
 func GetConfig() (*Config, error) {
 	// default config
 	cfg := &Config{
-		Host:        "localhost:8080",
-		DSN:         "host=localhost user=postgres password=postgres dbname=postgres port=5432 sslmode=disable",
-		AccrualAddr: "http://localhost:8081",
-		LogLevel:    "debug",
+		ServerConfig: server.ServerConfig{
+			Host: "localhost:8080",
+		},
+		AccrualConfig: accrual.AccrualConfig{
+			AccrualAddr: "http://localhost:8081",
+			Timeout:     5 * time.Second,
+		},
+		DBConfig: db.DBConfig{
+			DSN: "host=localhost user=postgres password=postgres dbname=postgres port=5432 sslmode=disable",
+		},
+		LogLevel: "debug",
 	}
 
 	// parse config from environment variables
+	if err := env.Parse(&cfg.ServerConfig); err != nil {
+		return nil, fmt.Errorf("failed to parse config: %w", err)
+	}
+	if err := env.Parse(&cfg.DBConfig); err != nil {
+		return nil, fmt.Errorf("failed to parse config: %w", err)
+	}
+	if err := env.Parse(&cfg.AccrualConfig); err != nil {
+		return nil, fmt.Errorf("failed to parse config: %w", err)
+	}
 	if err := env.Parse(cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
 	// CLI flags override ENV/default (only if explicitly set)
-	flag.StringVar(&cfg.Host, "a", cfg.Host, "server address")
-	flag.StringVar(&cfg.DSN, "d", cfg.DSN, "database URI")
-	flag.StringVar(&cfg.AccrualAddr, "r", cfg.AccrualAddr, "accrual system address")
+	flag.StringVar(&cfg.ServerConfig.Host, "a", cfg.ServerConfig.Host, "server address")
+	flag.StringVar(&cfg.DBConfig.DSN, "d", cfg.DBConfig.DSN, "database URI")
+	flag.StringVar(&cfg.AccrualConfig.AccrualAddr, "r", cfg.AccrualConfig.AccrualAddr, "accrual system address")
 	flag.StringVar(&cfg.LogLevel, "l", cfg.LogLevel, "log level")
+	flag.DurationVar(&cfg.AccrualConfig.Timeout, "t", cfg.AccrualConfig.Timeout, "accrual timeout")
 	flag.Parse()
 
 	return cfg, nil

@@ -8,7 +8,8 @@ import (
 	"loyaltySys/internal/config"
 	"loyaltySys/internal/handlers"
 	"loyaltySys/internal/logger"
-	"loyaltySys/internal/server"
+	"loyaltySys/internal/service/accrual"
+	"loyaltySys/internal/service/server"
 	"os"
 	"os/signal"
 	"syscall"
@@ -43,7 +44,7 @@ func run() error {
 	}
 
 	// Initialize storage
-	storage := handlers.NewStorage(ctx, cfg.DSN, l.SugaredLogger)
+	storage := handlers.NewStorage(ctx, cfg.DBConfig.DSN, l.SugaredLogger)
 	// Initialize handler
 	h := handlers.NewHandler(storage, l.SugaredLogger)
 	// Initialize server
@@ -51,6 +52,14 @@ func run() error {
 	// Start server
 	if err := srv.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start server: %w", err)
+	}
+
+	accrualStorage := accrual.NewStorage(ctx, cfg.DBConfig.DSN, l.SugaredLogger)
+	// Initialize accrual service
+	accrual := accrual.NewAccrualService(cfg.AccrualConfig.AccrualAddr, accrualStorage, cfg.AccrualConfig, l.SugaredLogger)
+	// Start accrual service
+	if err := accrual.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start accrual service: %w", err)
 	}
 	return nil
 }

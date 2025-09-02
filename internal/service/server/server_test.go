@@ -4,6 +4,7 @@ import (
 	"context"
 	"loyaltySys/internal/config"
 	"loyaltySys/internal/handlers"
+	cfg "loyaltySys/internal/service/server/config"
 	"testing"
 	"time"
 
@@ -12,7 +13,7 @@ import (
 )
 
 func Test_Start(t *testing.T) {
-	cfg := &config.Config{Host: "127.0.0.1:0"}
+	cfg := &config.Config{ServerConfig: cfg.ServerConfig{Host: "127.0.0.1:0"}}
 	h := &handlers.Handler{}
 	logger := zap.NewNop().Sugar()
 
