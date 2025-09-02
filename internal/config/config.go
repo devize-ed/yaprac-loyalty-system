@@ -6,7 +6,6 @@ import (
 	db "loyaltySys/internal/db/config"
 	accrual "loyaltySys/internal/service/accrual/config"
 	server "loyaltySys/internal/service/server/config"
-	"time"
 
 	"github.com/caarlos0/env"
 )
@@ -27,7 +26,7 @@ func GetConfig() (*Config, error) {
 		},
 		AccrualConfig: accrual.AccrualConfig{
 			AccrualAddr: "http://localhost:8081",
-			Timeout:     5 * time.Second,
+			Timeout:     10,
 		},
 		DBConfig: db.DBConfig{
 			DSN: "host=localhost user=postgres password=postgres dbname=postgres port=5432 sslmode=disable",
@@ -54,7 +53,7 @@ func GetConfig() (*Config, error) {
 	flag.StringVar(&cfg.DBConfig.DSN, "d", cfg.DBConfig.DSN, "database URI")
 	flag.StringVar(&cfg.AccrualConfig.AccrualAddr, "r", cfg.AccrualConfig.AccrualAddr, "accrual system address")
 	flag.StringVar(&cfg.LogLevel, "l", cfg.LogLevel, "log level")
-	flag.DurationVar(&cfg.AccrualConfig.Timeout, "t", cfg.AccrualConfig.Timeout, "accrual timeout")
+	flag.IntVar(&cfg.AccrualConfig.Timeout, "t", cfg.AccrualConfig.Timeout, "accrual timeout in seconds")
 	flag.Parse()
 
 	return cfg, nil

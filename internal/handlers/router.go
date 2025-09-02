@@ -25,7 +25,7 @@ func (h *Handler) NewRouter() http.Handler {
 			r.Get("/orders", h.GetOrders())
 			r.Get("/balance", h.GetBalance())
 			r.Post("/balance/withdraw", h.Withdraw())
-			r.Get("/balance/withdrawals", h.GetWithdrawals())
+			r.Get("/withdrawals", h.GetWithdrawals())
 		})
 		// Routes for unauthenticated users
 		r.Post("/register", h.CreateUser())

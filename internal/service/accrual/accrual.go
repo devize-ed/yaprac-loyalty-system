@@ -64,7 +64,7 @@ func newRequest(accrualURL string) *resty.Request {
 // Start starts the accrual service
 func (s *AccrualService) Start(ctx context.Context) {
 	// Start the accrual service in a goroutine.
-	t := time.NewTicker(s.cfg.Timeout + 120*time.Millisecond)
+	t := time.NewTicker(time.Second*time.Duration(s.cfg.Timeout) + 120*time.Millisecond)
 	go func() {
 		for {
 			select {
@@ -82,6 +82,7 @@ func (s *AccrualService) Start(ctx context.Context) {
 			}
 		}
 	}()
+	s.logger.Info("accrual service started")
 }
 
 func (s *AccrualService) processOrders(ctx context.Context) error {
@@ -102,7 +103,7 @@ func (s *AccrualService) processOrders(ctx context.Context) error {
 }
 
 func (s *AccrualService) createRequesters(ctx context.Context, orders []*models.Order) {
-	ctxTimeout, cancel := context.WithTimeout(ctx, s.cfg.Timeout)
+	ctxTimeout, cancel := context.WithTimeout(ctx, time.Second*time.Duration(s.cfg.Timeout))
 	defer cancel()
 	var wait bool
 	if a := s.sendAfter.Load(); a > 0 {

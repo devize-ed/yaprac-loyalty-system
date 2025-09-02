@@ -104,6 +104,6 @@ esac
 
 # Withdrawals list (200 or 204)
 say "Withdrawals list"
-curl -i -s -X GET "$ADDR/api/user/balance/withdrawals" -H "$AUTH" | sed -n '1,15p'
+curl -i -s -X GET "$ADDR/api/user/withdrawals" -H "$AUTH" | sed -n '1,15p'
 
 say "E2E script finished successfully"

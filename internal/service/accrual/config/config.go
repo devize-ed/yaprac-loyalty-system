@@ -1,8 +1,7 @@
 package config
 
-import "time"
-
+// Accrual service configuration. Timeout is specified in seconds.
 type AccrualConfig struct {
-	AccrualAddr string        `env:"ACCRUAL_SYSTEM_ADDRESS"`       // Accrual system address
-	Timeout     time.Duration `env:"ACCRUAL_TIMEOUT" default:"10"` // Timeout for accrual request
+	AccrualAddr string `env:"ACCRUAL_SYSTEM_ADDRESS"` // Accrual system address
+	Timeout     int    `env:"ACCRUAL_TIMEOUT"`        // Timeout in seconds for accrual requests
 }

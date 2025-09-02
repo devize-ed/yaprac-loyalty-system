@@ -47,17 +47,17 @@ func run() error {
 	storage := handlers.NewStorage(ctx, cfg.DBConfig.DSN, l.SugaredLogger)
 	// Initialize handler
 	h := handlers.NewHandler(storage, l.SugaredLogger)
+
+	// Initialize accrual service and start it
+	accrualStorage := accrual.NewStorage(ctx, cfg.DBConfig.DSN, l.SugaredLogger)
+	accrualSvc := accrual.NewAccrualService(cfg.AccrualConfig.AccrualAddr, accrualStorage, cfg.AccrualConfig, l.SugaredLogger)
+	accrualSvc.Start(ctx)
+
 	// Initialize server
 	srv := server.NewServer(cfg, h, l.SugaredLogger)
 	// Start server
 	if err := srv.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start server: %w", err)
 	}
-
-	accrualStorage := accrual.NewStorage(ctx, cfg.DBConfig.DSN, l.SugaredLogger)
-	// Initialize accrual service
-	accrual := accrual.NewAccrualService(cfg.AccrualConfig.AccrualAddr, accrualStorage, cfg.AccrualConfig, l.SugaredLogger)
-	// Start accrual service
-	accrual.Start(ctx)
 	return nil
 }

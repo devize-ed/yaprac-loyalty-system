@@ -126,6 +126,11 @@ func (h *Handler) LoginUser() http.HandlerFunc {
 		h.logger.Debug("Searching user in the database")
 		registeredUser, err := h.storage.GetUser(r.Context(), user.Login)
 		if err != nil {
+			if errors.Is(err, db.ErrUserNotFound) {
+				h.logger.Error("user not found: ", err)
+				http.Error(w, "Invalid login or password", http.StatusUnauthorized)
+				return
+			}
 			h.logger.Error("failed to get user: ", err)
 			http.Error(w, "Failed to get user", http.StatusInternalServerError)
 			return
@@ -189,7 +194,7 @@ func (h *Handler) CreateOrder() http.HandlerFunc {
 				// Check if the order already added by this user - return 200
 			} else if errors.Is(err, db.ErrOrderAlreadyExists) {
 				h.logger.Error("order already added by this user: ", err)
-				http.Error(w, "Order already added by this user", http.StatusOK)
+				w.WriteHeader(http.StatusOK)
 				return
 			}
 			// Return 500
@@ -230,9 +235,12 @@ func (h *Handler) GetOrders() http.HandlerFunc {
 			return
 		}
 		h.logger.Debug("Orders found for user: ", userID)
-		// Return the orders
-		json.NewEncoder(w).Encode(orders)
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
+		// Return the orders
+		if err := json.NewEncoder(w).Encode(orders); err != nil {
+			h.logger.Error("failed to encode orders: ", err)
+		}
 	}
 }
 
@@ -257,9 +265,12 @@ func (h *Handler) GetBalance() http.HandlerFunc {
 			return
 		}
 		h.logger.Debug("Balance: ", balance)
-		// Return the balance
-		json.NewEncoder(w).Encode(balance)
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
+		// Return the balance
+		if err := json.NewEncoder(w).Encode(balance); err != nil {
+			h.logger.Error("failed to encode balance: ", err)
+		}
 	}
 }
 
@@ -282,7 +293,7 @@ func (h *Handler) Withdraw() http.HandlerFunc {
 		err = json.NewDecoder(r.Body).Decode(&withdrawal)
 		if err != nil {
 			h.logger.Error("failed to decode withdrawal: ", err)
-			http.Error(w, "Failed to decode withdrawal", http.StatusInternalServerError)
+			http.Error(w, "Invalid request", http.StatusBadRequest)
 			return
 		}
 		// Check if the withdrawal is valid
@@ -334,9 +345,18 @@ func (h *Handler) GetWithdrawals() http.HandlerFunc {
 			return
 		}
 		h.logger.Debug("Withdrawals: ", withdrawals)
+		// Return 204 if no withdrawals found for user - no content
+		if len(withdrawals) == 0 {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
 		// Return the withdrawals
-		json.NewEncoder(w).Encode(withdrawals)
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(withdrawals); err != nil {
+			h.logger.Error("failed to encode withdrawals: ", err)
+		}
 	}
 }
 

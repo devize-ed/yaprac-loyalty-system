@@ -168,21 +168,44 @@ func (db *DB) GetOrders(ctx context.Context, userID int64) ([]*models.Order, err
 // GetBalance gets the balance for the user and returns it.
 func (db *DB) GetBalance(ctx context.Context, userID int64) (*models.Balance, error) {
 	db.logger.Debugf("Getting balance for user %d", userID)
+	// Begin a new transaction
+	tx, err := db.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin a transaction: %w", err)
+	}
+	defer func() {
+		if err := tx.Rollback(ctx); err != nil && err != pgx.ErrTxClosed {
+			db.logger.Errorf("failed to rollback a transaction: %w", err)
+		}
+	}()
+
+	balance, err := db.loadBalance(ctx, tx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get balance: %w", err)
+	}
+
+	return balance, nil
+}
+
+// getBalanceInTx gets the balance for the user within a transaction and returns it.
+func (db *DB) loadBalance(ctx context.Context, tx pgx.Tx, userID int64) (*models.Balance, error) {
+	db.logger.Debugf("Getting balance for user %d within transaction", userID)
 
 	// Get the balance for the user
 	balance := &models.Balance{}
 	var accrual *float64
 	var withdrawn *float64
-	// Get the withdrawn sum
-	err := db.pool.QueryRow(ctx, "SELECT COALESCE(SUM(summ), 0) FROM withdrawals WHERE user_id = $1", userID).Scan(&withdrawn)
+
+	// Get the withdrawn sum within transaction
+	err := tx.QueryRow(ctx, "SELECT COALESCE(SUM(summ), 0) FROM withdrawals WHERE user_id = $1", userID).Scan(&withdrawn)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get balance: %w", err)
+		return nil, fmt.Errorf("failed to get withdrawn sum: %w", err)
 	}
 
-	// Get the accrual sum
-	err = db.pool.QueryRow(ctx, "SELECT COALESCE(SUM(accrual), 0) FROM orders WHERE user_id = $1 AND status = 'PROCESSED'", userID).Scan(&accrual)
+	// Get the accrual sum within transaction
+	err = tx.QueryRow(ctx, "SELECT COALESCE(SUM(accrual), 0) FROM orders WHERE user_id = $1 AND status = 'PROCESSED'", userID).Scan(&accrual)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get balance: %w", err)
+		return nil, fmt.Errorf("failed to get accrual sum: %w", err)
 	}
 
 	if withdrawn != nil {
@@ -209,12 +232,16 @@ func (db *DB) Withdraw(ctx context.Context, withdrawal *models.Withdrawal) error
 		}
 	}()
 
-	// lock the rows for the order and the withdrawal of the user
-	db.pool.Exec(ctx, "LOCK TABLE orders IN EXCLUSIVE MODE")
-	db.pool.Exec(ctx, "LOCK TABLE withdrawals IN EXCLUSIVE MODE")
+	// Lock tables within the transaction to prevent race conditions
+	if _, err := tx.Exec(ctx, "LOCK TABLE orders IN EXCLUSIVE MODE"); err != nil {
+		return fmt.Errorf("failed to lock orders table: %w", err)
+	}
+	if _, err := tx.Exec(ctx, "LOCK TABLE withdrawals IN EXCLUSIVE MODE"); err != nil {
+		return fmt.Errorf("failed to lock withdrawals table: %w", err)
+	}
 
-	// Check if the balance is enough
-	balance, err := db.GetBalance(ctx, withdrawal.UserID)
+	// Check if the balance is enough using transaction-aware GetBalance
+	balance, err := db.loadBalance(ctx, tx, withdrawal.UserID)
 	if err != nil {
 		return fmt.Errorf("failed to get balance: %w", err)
 	}
@@ -232,11 +259,7 @@ func (db *DB) Withdraw(ctx context.Context, withdrawal *models.Withdrawal) error
 		return fmt.Errorf("failed to create a withdrawal: %w", err)
 	}
 
-	// Unlock the rows for the order and the withdrawal of the user
-	db.pool.Exec(ctx, "UNLOCK TABLE orders")
-	db.pool.Exec(ctx, "UNLOCK TABLE withdrawals")
-
-	// Commit the transaction
+	// Commit the transaction (locks are automatically released)
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("failed to commit a transaction: %w", err)
 	}
@@ -295,7 +318,7 @@ func (db *DB) GetUnprocessedOrders(ctx context.Context) ([]*models.Order, error)
 func (db *DB) UpdateOrder(ctx context.Context, order *models.Order) error {
 	db.logger.Debugf("Updating order %s", order.Number)
 	// Update the order
-	if _, err := db.pool.Exec(ctx, "UPDATE orders SET status = $1, accrual = $2, WHERE order_number = $4", order.Status, order.Accrual, order.Number); err != nil {
+	if _, err := db.pool.Exec(ctx, "UPDATE orders SET status = $1, accrual = $2 WHERE order_number = $3", order.Status, order.Accrual, order.Number); err != nil {
 		return fmt.Errorf("failed to update an order: %w", err)
 	}
 	return nil
