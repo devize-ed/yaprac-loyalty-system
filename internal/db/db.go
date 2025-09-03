@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"loyaltySys/internal/db/migrations"
 	"loyaltySys/internal/models"
 
 	"github.com/jackc/pgx/v5"
@@ -20,7 +21,10 @@ type DB struct {
 // NewDB provides the new data base connection with the provided configuration.
 func NewDB(ctx context.Context, dsn string, logger *zap.SugaredLogger) (*DB, error) {
 	logger.Debugf("Connecting to database with DSN: %s", dsn)
-
+	// Run migrations before establishing the connection
+	if err := migrations.RunMigrations(dsn, true); err != nil {
+		return nil, fmt.Errorf("failed to run DB migrations: %w", err)
+	}
 	// Initialize a new connection pool with the provided DSN
 	pool, err := initPool(ctx, dsn, logger)
 	if err != nil {

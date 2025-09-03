@@ -6,15 +6,18 @@ import (
 	"loyaltySys/internal/models"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
 	"loyaltySys/internal/db"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/jwtauth/v5"
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func testEnv(t *testing.T) (*httptest.Server, *mocks.Storage, *chi.Mux, *Handler) {
@@ -33,14 +36,14 @@ func testEnv(t *testing.T) (*httptest.Server, *mocks.Storage, *chi.Mux, *Handler
 }
 
 // Injects a JWT token with the user_id claim into the request context.
-// func injectUserID(r *http.Request, id int64) *http.Request {
-// 	token := jwtauth.New("HS256", []byte("test-secret"), nil)
-// 	claims := map[string]interface{}{"user_id": strconv.FormatInt(id, 10)} // строка!
-// 	_, signed, _ := token.Encode(claims)
-// 	parsedToken, _ := token.Decode(signed)
-// 	ctx := jwtauth.NewContext(r.Context(), parsedToken, nil)
-// 	return r.WithContext(ctx)
-// }
+func injectUserID(r *http.Request, id int64) *http.Request {
+	token := jwtauth.New("HS256", []byte("test-secret"), nil)
+	claims := map[string]interface{}{"user_id": strconv.FormatInt(id, 10)} // строка!
+	_, signed, _ := token.Encode(claims)
+	parsedToken, _ := token.Decode(signed)
+	ctx := jwtauth.NewContext(r.Context(), parsedToken, nil)
+	return r.WithContext(ctx)
+}
 
 func TestHandler_CreateUser(t *testing.T) {
 	srv, st, r, h := testEnv(t)
@@ -93,3 +96,58 @@ func TestHandler_CreateUser(t *testing.T) {
 	}
 
 }
+
+func TestHandler_LoginUser(t *testing.T) {
+	srv, st, r, h := testEnv(t)
+	defer srv.Close()
+
+	testUser := &models.User{Login: "test1", Password: "test1"}
+	hashed, err := bcrypt.GenerateFromPassword([]byte(testUser.Password), bcrypt.DefaultCost)
+	assert.NoError(t, err)
+	registeredUser := &models.User{ID: 1, Login: testUser.Login, Password: string(hashed)}
+
+	r.Post("/api/user/login", h.LoginUser())
+
+	var tests = []struct {
+		name         string
+		requestBody  *models.User
+		EXPECT       *mock.Call
+		wantError    bool
+		expectedCode int
+	}{
+		{
+			name:         "login_user",
+			requestBody:  testUser,
+			EXPECT:       st.EXPECT().GetUser(mock.Anything, mock.Anything).Return(registeredUser, nil).Once(),
+			expectedCode: http.StatusOK,
+		},
+		{
+			name:         "user_not_found",
+			requestBody:  testUser,
+			EXPECT:       st.EXPECT().GetUser(mock.Anything, mock.Anything).Return(nil, db.ErrUserNotFound).Once(),
+			expectedCode: http.StatusUnauthorized,
+		},
+		{
+			name:         "invalid_request",
+			requestBody:  &models.User{Login: "", Password: ""},
+			EXPECT:       nil,
+			expectedCode: http.StatusBadRequest,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := resty.New().R().SetBody(tt.requestBody).Post(srv.URL + "/api/user/login")
+			assert.NoError(t, err)
+
+			assert.Equal(t, tt.expectedCode, resp.StatusCode())
+			if tt.expectedCode == http.StatusOK {
+				authz := resp.Header().Get("Authorization")
+				assert.NotEmpty(t, authz)
+				assert.Contains(t, authz, "Bearer ")
+			}
+		})
+	}
+
+}
+
