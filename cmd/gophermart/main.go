@@ -39,9 +39,7 @@ func run() error {
 	defer stop()
 
 	// Initialize JWT from environment variables
-	if err := auth.InitJWTFromEnv(); err != nil {
-		return fmt.Errorf("failed to initialize JWT: %w", err)
-	}
+	auth.InitJWTFromEnv(l.SugaredLogger)
 
 	// Initialize storage
 	storage := handlers.NewStorage(ctx, cfg.DBConfig.DSN, l.SugaredLogger)

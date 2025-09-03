@@ -1,0 +1,17 @@
+name: linter tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - main
+
+jobs:
+  statictest:
+    runs-on: ubuntu-latest
+    container: golang:1.24
+    steps:
+      - name: Run linter
+        run: |
+          golangci-lint run ./...

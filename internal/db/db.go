@@ -296,7 +296,10 @@ func (db *DB) GetWithdrawals(ctx context.Context, userID int64) ([]*models.Withd
 func (db *DB) GetUnprocessedOrders(ctx context.Context) ([]*models.Order, error) {
 	db.logger.Debug("Getting unprocessed orders")
 	// Get the unprocessed orders
-	rows, err := db.pool.Query(ctx, "SELECT order_number, status, accrual, uploaded_at FROM orders WHERE status = 'NEW' OR status = 'PROCESSING'")
+	rows, err := db.pool.Query(ctx, `
+  			SELECT order_number, status, COALESCE(accrual, 0) AS accrual, uploaded_at
+  			FROM orders
+ 			WHERE status IN ('NEW','PROCESSING')`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get unprocessed orders: %w", err)
 	}
@@ -304,12 +307,11 @@ func (db *DB) GetUnprocessedOrders(ctx context.Context) ([]*models.Order, error)
 
 	orders := []*models.Order{}
 	for rows.Next() {
-		order := &models.Order{}
-		err := rows.Scan(&order.Number, &order.Status, &order.Accrual, &order.UploadedAt)
-		if err != nil {
-			return nil, err
+		var o models.Order
+		if err := rows.Scan(&o.Number, &o.Status, &o.Accrual, &o.UploadedAt); err != nil {
+			return nil, fmt.Errorf("scan order: %w", err)
 		}
-		orders = append(orders, order)
+		orders = append(orders, &o)
 	}
 	return orders, nil
 }
@@ -318,8 +320,12 @@ func (db *DB) GetUnprocessedOrders(ctx context.Context) ([]*models.Order, error)
 func (db *DB) UpdateOrder(ctx context.Context, order *models.Order) error {
 	db.logger.Debugf("Updating order %s", order.Number)
 	// Update the order
-	if _, err := db.pool.Exec(ctx, "UPDATE orders SET status = $1, accrual = $2 WHERE order_number = $3", order.Status, order.Accrual, order.Number); err != nil {
+	cmdTag, err := db.pool.Exec(ctx, "UPDATE orders SET status = $1, accrual = $2 WHERE order_number = $3", order.Status, order.Accrual, order.Number)
+	if err != nil {
 		return fmt.Errorf("failed to update an order: %w", err)
+	}
+	if cmdTag.RowsAffected() == 0 {
+		return fmt.Errorf("update order %s affected 0 rows (not found?)", order.Number)
 	}
 	return nil
 }

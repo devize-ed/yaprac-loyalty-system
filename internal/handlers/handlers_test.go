@@ -19,13 +19,11 @@ import (
 
 func testEnv(t *testing.T) (*httptest.Server, *mocks.Storage, *chi.Mux, *Handler) {
 	t.Helper()
+	logger := zap.NewNop().Sugar()
 
 	t.Setenv("AUTH_SECRET", "test-secret")
-	if err := auth.InitJWTFromEnv(); err != nil {
-		t.Fatalf("InitJWTFromEnv failed: %v", err)
-	}
+	auth.InitJWTFromEnv(logger)
 
-	logger := zap.NewNop().Sugar()
 	st := mocks.NewStorage(t)
 	h := NewHandler(st, logger)
 	r := chi.NewRouter()

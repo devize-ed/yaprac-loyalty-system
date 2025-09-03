@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-chi/jwtauth/v5"
 	"github.com/lestrrat-go/jwx/v2/jwt"
+	"go.uber.org/zap"
 )
 
 // tokenOnce is a once.Do for the token auth.
@@ -22,17 +23,15 @@ var tokenOnce sync.Once
 var TokenAuth *jwtauth.JWTAuth
 
 // InitJWTFromEnv initializes the JWT authentication middleware from the environment variables.
-func InitJWTFromEnv() error {
-	var err error
+func InitJWTFromEnv(logger *zap.SugaredLogger) {
 	tokenOnce.Do(func() {
 		secret := os.Getenv("AUTH_SECRET")
 		if secret == "" {
-			err = errors.New("AUTH_SECRET is not set")
-			return
+			logger.Warn("AUTH_SECRET is not set, setting test secret")
+			secret = "test-secret"
 		}
 		TokenAuth = jwtauth.New("HS256", []byte(secret), nil, jwt.WithAcceptableSkew(30*time.Second))
 	})
-	return err
 }
 
 // GetUserIDFromCtx extracts the user ID from the JWT token in the context.

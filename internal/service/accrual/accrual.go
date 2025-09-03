@@ -3,6 +3,7 @@ package accrual
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"loyaltySys/internal/db"
 	"loyaltySys/internal/models"
@@ -35,139 +36,149 @@ func NewStorage(ctx context.Context, dsn string, logger *zap.SugaredLogger) Stor
 
 // AccrualService is the accrual service
 type AccrualService struct {
-	req       *resty.Request
-	cfg       config.AccrualConfig
-	storage   Storage
-	logger    *zap.SugaredLogger
+	client  *resty.Client
+	cfg     config.AccrualConfig
+	storage Storage
+
+	logger *zap.SugaredLogger
+
 	sendAfter atomic.Uint32
 	wg        sync.WaitGroup
 	errCh     chan error
 }
 
+type accrualResp struct {
+	Order   string   `json:"order"`
+	Status  string   `json:"status"`
+	Accrual *float64 `json:"accrual,omitempty"`
+}
+
 // NewAccrualService creates a new accrual service
 func NewAccrualService(accrualURL string, storage Storage, cfg config.AccrualConfig, logger *zap.SugaredLogger) *AccrualService {
+	client := resty.New().
+		SetBaseURL(accrualURL).
+		SetTimeout(time.Duration(cfg.Timeout) * time.Second)
+
 	return &AccrualService{
-		req:     newRequest(accrualURL),
+		client:  client,
 		cfg:     cfg,
 		storage: storage,
 		logger:  logger,
 	}
 }
 
-func newRequest(accrualURL string) *resty.Request {
-	client := resty.New()
-	client.SetBaseURL(accrualURL)
-	req := client.R()
-	return req
-}
-
 // Start starts the accrual service
 func (s *AccrualService) Start(ctx context.Context) {
-	// Start the accrual service in a goroutine.
 	t := time.NewTicker(time.Second*time.Duration(s.cfg.Timeout) + 120*time.Millisecond)
 	go func() {
+		defer t.Stop()
+		s.logger.Info("accrual service started")
 		for {
 			select {
 			case <-ctx.Done():
-				t.Stop()
 				s.logger.Info("accrual service stopped")
 				return
 			case <-t.C:
-				s.logger.Info("process orders")
-				err := s.processOrders(ctx)
-				if err != nil {
-					s.logger.Errorf("failed to process orders: %w", err)
-					continue
+				if err := s.processOrders(ctx); err != nil {
+					s.logger.Errorf("failed to process orders: %v", err)
 				}
 			}
 		}
 	}()
-	s.logger.Info("accrual service started")
 }
 
 func (s *AccrualService) processOrders(ctx context.Context) error {
-	s.errCh = make(chan error, 100)
 	orders, err := s.storage.GetUnprocessedOrders(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get unprocessed orders: %w", err)
 	}
-
-	s.createRequesters(ctx, orders)
-	s.wg.Wait()
-	close(s.errCh)
-	for err := range s.errCh {
-		return fmt.Errorf("failed to get accrual for order: %w", err)
+	if len(orders) == 0 {
+		return nil
 	}
 
-	return nil
-}
-
-func (s *AccrualService) createRequesters(ctx context.Context, orders []*models.Order) {
-	ctxTimeout, cancel := context.WithTimeout(ctx, time.Second*time.Duration(s.cfg.Timeout))
-	defer cancel()
-	var wait bool
-	if a := s.sendAfter.Load(); a > 0 {
-		s.logger.Infof("waiting for %d seconds", a)
-		s.sendAfter.Store(0)
-		time.Sleep(time.Second * time.Duration(a))
-		wait = true
+	if a := s.sendAfter.Swap(0); a > 0 {
+		s.logger.Infof("respecting Retry-After: sleeping %d seconds", a)
+		time.Sleep(time.Duration(a) * time.Second)
 	}
-	for i, order := range orders {
+
+	// create error channel
+	s.errCh = make(chan error, len(orders))
+
+	// create requesters
+	for _, order := range orders {
 		s.wg.Add(1)
-		go func(orderNum string) {
+		orderNum := order.Number
+		go func() {
 			defer s.wg.Done()
 
-			select {
-			case <-ctxTimeout.Done():
-				s.errCh <- fmt.Errorf("failed to get accrual for order, timeout %s: %w", orderNum, ctxTimeout.Err())
-				return
-			default:
-				if wait {
-					time.Sleep(time.Millisecond * time.Duration(i))
-					wait = false
-				}
-				err := s.getAccrual(ctxTimeout, orderNum)
-				if err != nil {
-					s.errCh <- fmt.Errorf("failed to get accrual for order: %w", err)
+			reqCtx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.Timeout)*time.Second)
+			defer cancel()
+
+			if err := s.getAccrual(reqCtx, orderNum); err != nil {
+				select {
+				case s.errCh <- fmt.Errorf("order %s: %w", orderNum, err):
+				default:
+					s.logger.Warnf("error channel is full; dropping error for order %s: %v", orderNum, err)
 				}
 			}
-		}(order.Number)
+		}()
 	}
+
+	s.wg.Wait()
+	close(s.errCh)
+
+	// collect errors
+	var joined error
+	for err := range s.errCh {
+		joined = errors.Join(joined, err)
+	}
+	return joined
 }
 
 func (s *AccrualService) getAccrual(ctx context.Context, orderNum string) error {
-	req := newRequest(s.cfg.AccrualAddr)
-	req.SetPathParam("order_number", orderNum).SetContext(ctx)
-	resp, err := req.Get("/api/orders/{order_number}")
+	resp, err := s.client.R().
+		SetContext(ctx).
+		SetPathParam("order_number", orderNum).
+		Get("/api/orders/{order_number}")
 	if err != nil {
-		return fmt.Errorf("failed to get accrual for order: %w", err)
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			return fmt.Errorf("request timeout: %w", err)
+		}
+		return fmt.Errorf("http request failed: %w", err)
 	}
 
 	switch resp.StatusCode() {
 	case http.StatusTooManyRequests:
-		s.logger.Errorf("Too many requests: %s", resp.String())
-		retryAfter, err := strconv.Atoi(resp.Header().Get("Retry-After"))
-		if err != nil {
-			return fmt.Errorf("failed to convert retry-after to int: %w", err)
+		retryAfter, convErr := strconv.Atoi(resp.Header().Get("Retry-After"))
+		if convErr != nil {
+			return fmt.Errorf("429 without valid Retry-After: %w", convErr)
 		}
 		s.sendAfter.Store(uint32(retryAfter))
-		return fmt.Errorf("failed to get accrual for order: %s", resp.String())
+		return fmt.Errorf("too many requests, retry-after=%d", retryAfter)
+
 	case http.StatusNoContent:
-		return fmt.Errorf("the order is not registered in the accrual system: %s", resp.String())
+		return fmt.Errorf("order not registered in accrual system")
+
 	case http.StatusInternalServerError:
-		return fmt.Errorf("failed to get accrual for order: %s", resp.String())
+		return fmt.Errorf("accrual service 500")
 	}
 
-	gotOrder := &models.Order{}
-	err = json.Unmarshal(resp.Body(), gotOrder)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal accrual for order: %w", err)
+	r := &accrualResp{}
+	if err := json.Unmarshal(resp.Body(), &r); err != nil {
+		return fmt.Errorf("unmarshal response: %w", err)
+	}
+
+	gotOrder := &models.Order{
+		Number: r.Order,
+		Status: models.OrderStatus(r.Status),
+	}
+	if r.Accrual != nil {
+		gotOrder.Accrual = *r.Accrual
 	}
 
 	if gotOrder.Status == models.StatusProcessed || gotOrder.Status == models.StatusInvalid {
-		err := s.storage.UpdateOrder(ctx, gotOrder)
-		if err != nil {
-			return fmt.Errorf("failed to update order: %w", err)
+		if err := s.storage.UpdateOrder(ctx, gotOrder); err != nil {
+			return fmt.Errorf("update order: %w", err)
 		}
 	}
 	return nil

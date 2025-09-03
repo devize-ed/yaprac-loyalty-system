@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/jwtauth/v5"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 )
 
 func TestGenerateToken(t *testing.T) {
@@ -15,7 +16,7 @@ func TestGenerateToken(t *testing.T) {
 	tokenOnce = sync.Once{}
 
 	t.Setenv("AUTH_SECRET", "sign-secret")
-	assert.NoError(t, InitJWTFromEnv(), "failed to initialize JWT")
+	InitJWTFromEnv(zap.NewNop().Sugar())
 
 	const uid int64 = 123
 	tokenStr, err := GenerateToken(uid)
