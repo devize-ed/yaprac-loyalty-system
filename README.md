@@ -1,25 +1,44 @@
-# go-musthave-diploma-tpl
+## Yaprac Loyalty System (Gophermart)
 
-Шаблон репозитория для индивидуального дипломного проекта курса «Go-разработчик»
-
-# Начало работы
-
-1. Склонируйте репозиторий в любую подходящую директорию на вашем компьютере.
-2. В корне репозитория выполните команду `go mod init <name>` (где `<name>` — адрес вашего репозитория на GitHub без
-   префикса `https://`) для создания модуля
-
-# Обновление шаблона
-
-Чтобы иметь возможность получать обновления автотестов и других частей шаблона, выполните команду:
-
-```
-git remote add -m master template https://github.com/yandex-praktikum/go-musthave-diploma-tpl.git
+### Mock generate
+```bash
+make mock-gen
 ```
 
-Для обновления кода автотестов выполните команду:
-
+### Run service
+1) Start Postgres:
+```bash
+make up
 ```
-git fetch template && git checkout template/master .github
+
+2) Run the server:
+```bash
+make run
 ```
 
-Затем добавьте полученные изменения в свой репозиторий.
+Run in background and capture logs in `.tmp/server.log`:
+```bash
+make run-bg
+```
+
+3) Stop the background server and clean containers:
+```bash
+make stop
+make down
+```
+
+### Testing
+- Unit tests:
+```bash
+make test
+```
+
+- End‑to‑end tests:
+```bash
+make test e2e
+```
+
+### Build
+```bash
+make build
+```

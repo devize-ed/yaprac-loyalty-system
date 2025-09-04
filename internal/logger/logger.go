@@ -19,7 +19,7 @@ func Initialize(level string) (*Logger, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	// create config for the logger
 	cfg := zap.NewDevelopmentConfig()
 	cfg.Level = lvl
 	cfg.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout("2006/01/02 15:04:05")
@@ -29,6 +29,7 @@ func Initialize(level string) (*Logger, error) {
 	cfg.EncoderConfig.LevelKey = "level"
 	cfg.DisableStacktrace = true
 
+	// build the logger
 	zl, err := cfg.Build(
 		zap.AddStacktrace(zapcore.FatalLevel),
 		zap.AddCaller(),
@@ -40,6 +41,7 @@ func Initialize(level string) (*Logger, error) {
 	return &Logger{SugaredLogger: zl.Sugar()}, nil
 }
 
+// SafeSync syncs the logger.
 func (l *Logger) SafeSync() {
 	if l.SugaredLogger == nil {
 		return

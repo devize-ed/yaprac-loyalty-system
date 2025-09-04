@@ -98,17 +98,20 @@ func (db *DB) CreateUser(ctx context.Context, user *models.User) (userID int64, 
 // GetUser gets the user by login and returns the hash of the password.
 func (db *DB) GetUser(ctx context.Context, login string) (*models.User, error) {
 	db.logger.Debugf("Getting user by login: %s", login)
-
+	// Get the user by login
 	u := &models.User{}
 	err := db.pool.QueryRow(ctx,
 		`SELECT id, password FROM users WHERE login=$1`, login,
 	).Scan(&u.ID, &u.Password)
+	// If the user is not found, return an error
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrUserNotFound
 	}
+	// If the user is found, return the user
 	if err != nil {
 		return nil, fmt.Errorf("select user: %w", err)
 	}
+	// Set the login
 	u.Login = login
 	return u, nil
 }
@@ -152,18 +155,21 @@ func (db *DB) GetOrders(ctx context.Context, userID int64) ([]*models.Order, err
 		return nil, fmt.Errorf("failed to get orders: %w", err)
 	}
 	defer rows.Close()
-
+	// Get the orders
 	orders := []*models.Order{}
 	for rows.Next() {
 		order := &models.Order{}
+		// Scan the order
 		var accrual *float64
 		err := rows.Scan(&order.Number, &order.Status, &accrual, &order.UploadedAt)
 		if err != nil {
 			return nil, err
 		}
+		// If the accrual sum is not nil, set the accrual sum
 		if accrual != nil {
 			order.Accrual = *accrual
 		}
+		// Append the order to the list
 		orders = append(orders, order)
 	}
 	return orders, nil
@@ -182,7 +188,7 @@ func (db *DB) GetBalance(ctx context.Context, userID int64) (*models.Balance, er
 			db.logger.Errorf("failed to rollback a transaction: %w", err)
 		}
 	}()
-
+	// Get the balance
 	balance, err := db.loadBalance(ctx, tx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get balance: %w", err)
@@ -211,10 +217,11 @@ func (db *DB) loadBalance(ctx context.Context, tx pgx.Tx, userID int64) (*models
 	if err != nil {
 		return nil, fmt.Errorf("failed to get accrual sum: %w", err)
 	}
-
+	// If the withdrawn sum is not nil, set the withdrawn sum
 	if withdrawn != nil {
 		balance.Withdrawn = *withdrawn
 	}
+	// If the accrual sum is not nil, set the accrual sum
 	if accrual != nil {
 		balance.Current = *accrual - balance.Withdrawn
 	}
@@ -249,7 +256,7 @@ func (db *DB) Withdraw(ctx context.Context, withdrawal *models.Withdrawal) error
 	if err != nil {
 		return fmt.Errorf("failed to get balance: %w", err)
 	}
-
+	// If the balance is not enough, return an error
 	if balance.Current < withdrawal.Sum {
 		db.logger.Debugf("insufficient balance: %f < %f", balance.Current, withdrawal.Sum)
 		return ErrInsufficientBalance
@@ -280,15 +287,17 @@ func (db *DB) GetWithdrawals(ctx context.Context, userID int64) ([]*models.Withd
 		return nil, fmt.Errorf("failed to get withdrawals: %w", err)
 	}
 	defer rows.Close()
-
+	// Get the withdrawals
 	withdrawals := []*models.Withdrawal{}
 
 	for rows.Next() {
+		// Scan the withdrawal
 		withdrawal := &models.Withdrawal{}
 		err := rows.Scan(&withdrawal.Order, &withdrawal.Sum, &withdrawal.ProcessedAt)
 		if err != nil {
 			return nil, err
 		}
+		// Append the withdrawal to the list
 		withdrawals = append(withdrawals, withdrawal)
 	}
 
@@ -308,13 +317,15 @@ func (db *DB) GetUnprocessedOrders(ctx context.Context) ([]*models.Order, error)
 		return nil, fmt.Errorf("failed to get unprocessed orders: %w", err)
 	}
 	defer rows.Close()
-
+	// Get the unprocessed orders
 	orders := []*models.Order{}
+	// Scan the orders
 	for rows.Next() {
 		var o models.Order
 		if err := rows.Scan(&o.Number, &o.Status, &o.Accrual, &o.UploadedAt); err != nil {
 			return nil, fmt.Errorf("scan order: %w", err)
 		}
+		// Append the order to the list
 		orders = append(orders, &o)
 	}
 	return orders, nil
@@ -328,6 +339,7 @@ func (db *DB) UpdateOrder(ctx context.Context, order *models.Order) error {
 	if err != nil {
 		return fmt.Errorf("failed to update an order: %w", err)
 	}
+	// If the order is not found, return an error
 	if cmdTag.RowsAffected() == 0 {
 		return fmt.Errorf("update order %s affected 0 rows (not found?)", order.Number)
 	}

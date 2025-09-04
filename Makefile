@@ -23,19 +23,14 @@ DC := docker compose -p $(PROJECT_NAME)
 
 PIDFILE := .tmp/server.pid
 
-.PHONY: up migrate down ps logs build run run-bg stop test e2e e2e-keep clean tests ci tests-local status kill-port \
+.PHONY: up down ps logs build run run-bg wait-db stop test e2e e2e-keep clean tests ci tests-local status kill-port \
         t.register t.login t.order t.order-invalid t.orders t.balance t.withdraw t.withdrawals t.auth t.logout mock-gen
 
-## up: start Postgres and run migrations
+## up: start Postgres
 up:
 	@echo "==> Starting Postgres..."
 	$(DC) up -d db
-	@echo "==> Running migrations..."
-	$(DC) up migrate
 
-## migrate: run migrations manually
-migrate:
-	$(DC) run --rm migrate
 
 ## down: stop everything and remove volumes
 down:
@@ -52,6 +47,14 @@ logs:
 ## build: build server binary
 build:
 	$(GO) build -o ./cmd/gophermart ./cmd/gophermart
+
+wait-db:
+	@echo "==> Waiting for Postgres (docker health or pg_isready) ..."
+	@for i in $$(seq 1 60); do \
+		$(DC) exec -T db bash -lc 'pg_isready -U postgres -d postgres -h localhost -p 5432' >/dev/null 2>&1 && { echo "Postgres is ready"; exit 0; }; \
+		sleep 1; \
+	done; \
+	echo "ERROR: Postgres is not ready"; exit 1
 
 ## run: run server in foreground
 run:
@@ -103,6 +106,7 @@ e2e:
 	trap '$(MAKE) stop; $(DC) down -v' EXIT; \
 	$(MAKE) stop; \
 	$(MAKE) up; \
+	$(MAKE) wait-db; \
 	$(MAKE) run-bg; \
 	if [ -x ./scripts/e2e.sh ]; then bash ./scripts/e2e.sh; else bash ./tests.sh; fi
 
@@ -112,6 +116,7 @@ e2e-keep:
 	trap '$(MAKE) stop; $(DC) down' EXIT; \
 	$(MAKE) stop; \
 	$(MAKE) up; \
+	$(MAKE) wait-db; \
 	$(MAKE) run-bg; \
 	if [ -x ./scripts/e2e.sh ]; then bash ./scripts/e2e.sh; else bash ./tests.sh; fi
 
@@ -186,4 +191,5 @@ t.withdrawals:
 	@AUTH=$$(cat .tmp/auth.h); curl -i -X GET "$(BASE)/api/user/withdrawals" -H "$$AUTH"
 
 mock-gen:
-	mockery --name=Storage --with-expecter --dir=internal/handlers --output=internal/handlers/mocks --outpkg=mocks
+	mockery --name=Storage --with-expecter --dir=internal/handlers --output=internal/handlers/mocks --outpkg=mocks && \
+	mockery --name=Storage --with-expecter --dir=internal/service/accrual --output=internal/service/accrual/mocks --outpkg=mocks

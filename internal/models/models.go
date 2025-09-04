@@ -28,6 +28,17 @@ type Order struct {
 	UploadedAt time.Time   `json:"uploaded_at,omitempty"`
 }
 
+// NewOrder creates a new order
+func NewOrder(orderNumber string, userID int64) *Order {
+	return &Order{
+		UserID:     userID,
+		Number:     orderNumber,
+		Status:     "NEW",
+		Accrual:    0,
+		UploadedAt: time.Now(),
+	}
+}
+
 type Withdrawal struct {
 	Order       string    `json:"order"`
 	UserID      int64     `json:"-"`

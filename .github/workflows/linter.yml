@@ -1,11 +1,13 @@
 name: linter tests
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches:
-      - master
       - main
+      - master
+      - development
 
 jobs:
   statictest:

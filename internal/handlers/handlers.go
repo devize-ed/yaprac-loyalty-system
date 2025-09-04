@@ -9,12 +9,12 @@ import (
 	"loyaltySys/internal/db"
 	"loyaltySys/internal/models"
 	"net/http"
-	"time"
 
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
 
+// Storage interface for the handler
 type Storage interface {
 	CreateUser(ctx context.Context, user *models.User) (int64, error)
 	GetUser(ctx context.Context, login string) (*models.User, error)
@@ -25,6 +25,7 @@ type Storage interface {
 	Withdraw(ctx context.Context, withdrawal *models.Withdrawal) error
 }
 
+// NewStorage creates a new storage for the handler
 func NewStorage(ctx context.Context, dsn string, logger *zap.SugaredLogger) Storage {
 	db, err := db.NewDB(ctx, dsn, logger)
 	if err != nil {
@@ -34,11 +35,13 @@ func NewStorage(ctx context.Context, dsn string, logger *zap.SugaredLogger) Stor
 	return db
 }
 
+// Handler struct for the handler
 type Handler struct {
 	storage Storage
 	logger  *zap.SugaredLogger
 }
 
+// NewHandler creates a new handler
 func NewHandler(s Storage, logger *zap.SugaredLogger) *Handler {
 	return &Handler{
 		storage: s,
@@ -184,7 +187,7 @@ func (h *Handler) CreateOrder() http.HandlerFunc {
 		}
 		h.logger.Debug("User ID: ", userID)
 		// Create the order in the database
-		err = h.storage.CreateOrder(r.Context(), newOrder(string(orderNumber), userID))
+		err = h.storage.CreateOrder(r.Context(), models.NewOrder(string(orderNumber), userID))
 		if err != nil {
 			// Check if the order already added by another user - return 409
 			if errors.Is(err, db.ErrOrderAlreadyAdded) {
@@ -357,15 +360,5 @@ func (h *Handler) GetWithdrawals() http.HandlerFunc {
 		if err := json.NewEncoder(w).Encode(withdrawals); err != nil {
 			h.logger.Error("failed to encode withdrawals: ", err)
 		}
-	}
-}
-
-func newOrder(orderNumber string, userID int64) *models.Order {
-	return &models.Order{
-		UserID:     userID,
-		Number:     orderNumber,
-		Status:     "NEW",
-		Accrual:    0,
-		UploadedAt: time.Now(),
 	}
 }
