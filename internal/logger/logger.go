@@ -46,7 +46,7 @@ func (l *Logger) SafeSync() {
 	if l.SugaredLogger == nil {
 		return
 	}
-	if err := l.SugaredLogger.Sync(); err != nil {
+	if err := l.Sync(); err != nil {
 		var pe *os.PathError
 		if errors.As(err, &pe) && (errors.Is(pe.Err, syscall.EINVAL) || errors.Is(pe.Err, syscall.ENOTTY)) {
 			return
@@ -54,6 +54,6 @@ func (l *Logger) SafeSync() {
 		if errors.Is(err, syscall.EINVAL) || errors.Is(err, syscall.ENOTTY) {
 			return
 		}
-		l.SugaredLogger.Errorf("failed to sync logger: %w", err)
+		l.Errorf("failed to sync logger: %w", err)
 	}
 }

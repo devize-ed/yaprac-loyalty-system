@@ -1,3 +1,6 @@
+//go:build mock_tests
+// +build mock_tests
+
 package accrual
 
 import (
@@ -17,8 +20,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
 )
-
-// Skipping NewStorage DB connectivity tests; covered via integration elsewhere.
 
 func TestAccrualService_Start(t *testing.T) {
 	type fields struct {

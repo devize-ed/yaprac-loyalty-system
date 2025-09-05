@@ -259,6 +259,7 @@ func (db *DB) Withdraw(ctx context.Context, withdrawal *models.Withdrawal) error
 	// If the balance is not enough, return an error
 	if balance.Current < withdrawal.Sum {
 		db.logger.Debugf("insufficient balance: %f < %f", balance.Current, withdrawal.Sum)
+		fmt.Println("insufficient balance: ", balance.Current, withdrawal.Sum)
 		return ErrInsufficientBalance
 	}
 
@@ -341,7 +342,7 @@ func (db *DB) UpdateOrder(ctx context.Context, order *models.Order) error {
 	}
 	// If the order is not found, return an error
 	if cmdTag.RowsAffected() == 0 {
-		return fmt.Errorf("update order %s affected 0 rows (not found?)", order.Number)
+		return ErrOrderNotFound
 	}
 	return nil
 }

@@ -1,3 +1,6 @@
+//go:build mock_tests
+// +build mock_tests
+
 package handlers
 
 import (

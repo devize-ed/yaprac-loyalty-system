@@ -138,12 +138,12 @@ func TestGetConfig_PriorityFlagsOverEnv(t *testing.T) {
 
 			// Clear all environment variables first
 			for _, k := range envKeys {
-				os.Unsetenv(k)
+				assert.NoError(t, os.Unsetenv(k))
 			}
 
 			// Set environment variables for this test case
 			for k, v := range tc.envVars {
-				os.Setenv(k, v)
+				assert.NoError(t, os.Setenv(k, v))
 			}
 
 			// Set command line arguments
@@ -211,10 +211,10 @@ func TestGetConfig_EnvironmentVariableParsing(t *testing.T) {
 			// Clear and set environment variables
 			envKeys := []string{"RUN_ADDRESS", "DATABASE_URI", "ACCRUAL_SYSTEM_ADDRESS", "ACCRUAL_TIMEOUT", "LOG_LEVEL"}
 			for _, k := range envKeys {
-				os.Unsetenv(k)
+				assert.NoError(t, os.Unsetenv(k))
 			}
 			for k, v := range tc.envVars {
-				os.Setenv(k, v)
+				assert.NoError(t, os.Setenv(k, v))
 			}
 
 			// Set empty command line args
@@ -284,7 +284,7 @@ func TestGetConfig_FlagParsing(t *testing.T) {
 			// Clear environment variables
 			envKeys := []string{"RUN_ADDRESS", "DATABASE_URI", "ACCRUAL_SYSTEM_ADDRESS", "ACCRUAL_TIMEOUT", "LOG_LEVEL"}
 			for _, k := range envKeys {
-				os.Unsetenv(k)
+				assert.NoError(t, os.Unsetenv(k))
 			}
 
 			// Set command line arguments
