@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-set -euo pipefail
+if set -o pipefail 2>/dev/null; then
+  set -euo pipefail
+else
+  set -eu
+fi
 
 # Setup variables
 ADDR="${ADDR:-http://localhost:8080}"

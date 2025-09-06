@@ -259,7 +259,6 @@ func (db *DB) Withdraw(ctx context.Context, withdrawal *models.Withdrawal) error
 	// If the balance is not enough, return an error
 	if balance.Current < withdrawal.Sum {
 		db.logger.Debugf("insufficient balance: %f < %f", balance.Current, withdrawal.Sum)
-		fmt.Println("insufficient balance: ", balance.Current, withdrawal.Sum)
 		return ErrInsufficientBalance
 	}
 
