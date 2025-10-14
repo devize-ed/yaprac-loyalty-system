@@ -250,7 +250,7 @@ func TestHandler_GetOrders(t *testing.T) {
 	uploadedAt, err := time.Parse("2006-01-02T15:04:05-07:00", "2020-12-10T15:15:45+03:00")
 	assert.NoError(t, err)
 
-	orders := []*models.Order{
+	orders := []models.Order{
 		{
 			UserID:     1,
 			Number:     "9278923470",
@@ -288,7 +288,7 @@ func TestHandler_GetOrders(t *testing.T) {
 		{
 			name:         "no_orders",
 			token:        token,
-			EXPECT:       st.EXPECT().GetOrders(mock.Anything, mock.Anything).Return([]*models.Order{}, nil).Once(),
+			EXPECT:       st.EXPECT().GetOrders(mock.Anything, mock.Anything).Return([]models.Order{}, nil).Once(),
 			expectedCode: http.StatusNoContent,
 			expectedBody: "",
 		},
@@ -469,7 +469,7 @@ func TestHandler_GetWithdrawals(t *testing.T) {
 	uploadedAt, err := time.Parse("2006-01-02T15:04:05-07:00", "2020-12-10T15:15:45+03:00")
 	assert.NoError(t, err)
 
-	withdrawals := []*models.Withdrawal{
+	withdrawals := []models.Withdrawal{
 		{
 			UserID:      1,
 			Order:       "9278923470",
@@ -507,7 +507,7 @@ func TestHandler_GetWithdrawals(t *testing.T) {
 		{
 			name:         "no_withdrawals",
 			token:        token,
-			EXPECT:       st.EXPECT().GetWithdrawals(mock.Anything, mock.Anything).Return([]*models.Withdrawal{}, nil).Once(),
+			EXPECT:       st.EXPECT().GetWithdrawals(mock.Anything, mock.Anything).Return([]models.Withdrawal{}, nil).Once(),
 			expectedCode: http.StatusNoContent,
 			expectedBody: "",
 		},

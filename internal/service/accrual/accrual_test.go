@@ -69,7 +69,7 @@ func TestAccrualService_Start(t *testing.T) {
 
 			// use mock storage to avoid real DB dependency
 			mockStorage := mocks.NewStorage(t)
-			mockStorage.EXPECT().GetUnprocessedOrders(mock.Anything).Return(make([]*models.Order, 0), nil)
+			mockStorage.EXPECT().GetUnprocessedOrders(mock.Anything).Return(make([]models.Order, 0), nil)
 			s.storage = mockStorage
 			s.Start(tt.args.ctx)
 			time.Sleep(300 * time.Millisecond)
@@ -103,7 +103,7 @@ func TestAccrualService_processOrders(t *testing.T) {
 				cfg:    config.AccrualConfig{Timeout: 0},
 				storage: func() Storage {
 					m := mocks.NewStorage(t)
-					m.EXPECT().GetUnprocessedOrders(mock.Anything).Return([]*models.Order{}, nil)
+					m.EXPECT().GetUnprocessedOrders(mock.Anything).Return([]models.Order{}, nil)
 					return m
 				}(),
 				logger: zap.NewNop().Sugar(),
@@ -123,7 +123,7 @@ func TestAccrualService_processOrders(t *testing.T) {
 				t.Cleanup(srv.Close)
 
 				m := mocks.NewStorage(t)
-				m.EXPECT().GetUnprocessedOrders(mock.Anything).Return([]*models.Order{{Number: "123"}}, nil)
+				m.EXPECT().GetUnprocessedOrders(mock.Anything).Return([]models.Order{{Number: "123"}}, nil)
 				m.EXPECT().UpdateOrder(mock.Anything, mock.MatchedBy(func(o *models.Order) bool {
 					return o.Number == "123" && o.Status == models.StatusProcessed && o.Accrual == 12.5
 				})).Return(nil)
@@ -153,7 +153,7 @@ func TestAccrualService_processOrders(t *testing.T) {
 				t.Cleanup(srv.Close)
 
 				m := mocks.NewStorage(t)
-				m.EXPECT().GetUnprocessedOrders(mock.Anything).Return([]*models.Order{{Number: "ok"}, {Number: "err"}}, nil)
+				m.EXPECT().GetUnprocessedOrders(mock.Anything).Return([]models.Order{{Number: "ok"}, {Number: "err"}}, nil)
 				m.EXPECT().UpdateOrder(mock.Anything, mock.MatchedBy(func(o *models.Order) bool { return o.Number == "ok" && o.Status == models.StatusProcessed })).Return(nil)
 
 				return fields{

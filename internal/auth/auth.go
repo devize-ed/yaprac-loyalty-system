@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"loyaltySys/internal/models"
 	"os"
 	"strconv"
@@ -16,11 +15,18 @@ import (
 	"go.uber.org/zap"
 )
 
-// tokenOnce is a once.Do for the token auth.
-var tokenOnce sync.Once
+var (
+	tokenOnce sync.Once          // tokenOnce is a once.Do for the token auth.
+	TokenAuth *jwtauth.JWTAuth   // TokenAuth is the JWT authentication middleware.
+	tokenSkew = 30 * time.Second // tokenSkew is the acceptable skew for the token.
+)
 
-// TokenAuth is the JWT authentication middleware.
-var TokenAuth *jwtauth.JWTAuth
+var (
+	errClaimNotFound       = errors.New("user_id not found in claims")     // errClaimNotFound is the error returned when the user ID is not found in the claims.
+	errCredRequired        = errors.New("login and password are required") // errCredRequired is the error returned when the login and password are required.
+	errOrderNumberRequired = errors.New("order number is required")        // errOrderNumberRequired is the error returned when the order number is required.
+	errInvalidOrderNumber  = errors.New("invalid order number")            // errInvalidOrderNumber is the error returned when the order number is invalid.
+)
 
 // InitJWTFromEnv initializes the JWT authentication middleware from the environment variables.
 func InitJWTFromEnv(logger *zap.SugaredLogger) {
@@ -30,7 +36,7 @@ func InitJWTFromEnv(logger *zap.SugaredLogger) {
 			logger.Warn("AUTH_SECRET is not set, setting test secret")
 			secret = "test-secret"
 		}
-		TokenAuth = jwtauth.New("HS256", []byte(secret), nil, jwt.WithAcceptableSkew(30*time.Second))
+		TokenAuth = jwtauth.New("HS256", []byte(secret), nil, jwt.WithAcceptableSkew(tokenSkew))
 	})
 }
 
@@ -41,8 +47,7 @@ func GetUserIDFromCtx(ctx context.Context) (int64, error) {
 	// Check if the user ID is in the claims
 	userID, ok := claims["user_id"].(string)
 	if !ok {
-		log.Println("user_id not found in claims: ", claims)
-		return 0, errors.New("user_id not found in claims")
+		return 0, errClaimNotFound
 	}
 	return strconv.ParseInt(userID, 10, 64)
 }
@@ -50,7 +55,7 @@ func GetUserIDFromCtx(ctx context.Context) (int64, error) {
 // validateUser validates the user.
 func ValidateUser(user models.User) (bool, error) {
 	if user.Login == "" || user.Password == "" {
-		return false, errors.New("login and password are required")
+		return false, errCredRequired
 	}
 	return true, nil
 }
@@ -58,10 +63,10 @@ func ValidateUser(user models.User) (bool, error) {
 // validateOrderNumber validates the order number.
 func ValidateOrderNumber(orderNumber string) (bool, error) {
 	if orderNumber == "" {
-		return false, errors.New("order number is required")
+		return false, errOrderNumberRequired
 	}
 	if !checkLuhn(orderNumber) {
-		return false, errors.New("invalid order number")
+		return false, errInvalidOrderNumber
 	}
 	return true, nil
 }

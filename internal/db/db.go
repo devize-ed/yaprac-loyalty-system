@@ -77,7 +77,7 @@ func (db *DB) CreateUser(ctx context.Context, user *models.User) (userID int64, 
 	}
 	defer func() {
 		if err := tx.Rollback(ctx); err != nil && err != pgx.ErrTxClosed {
-			db.logger.Errorf("failed to rollback a transaction: %w", err)
+			db.logger.Errorf("failed to rollback a transaction: %v", err)
 		}
 	}()
 	// Add a new user to the database if the user already exists, return an error
@@ -126,7 +126,7 @@ func (db *DB) CreateOrder(ctx context.Context, order *models.Order) error {
 	}
 	defer func() {
 		if err := tx.Rollback(ctx); err != nil && err != pgx.ErrTxClosed {
-			db.logger.Errorf("failed to rollback a transaction: %w", err)
+			db.logger.Errorf("failed to rollback a transaction: %v", err)
 		}
 	}()
 
@@ -147,7 +147,7 @@ func (db *DB) CreateOrder(ctx context.Context, order *models.Order) error {
 }
 
 // GetOrders gets the orders for the user and returns them.
-func (db *DB) GetOrders(ctx context.Context, userID int64) ([]*models.Order, error) {
+func (db *DB) GetOrders(ctx context.Context, userID int64) ([]models.Order, error) {
 	db.logger.Debugf("Getting orders for user %d", userID)
 	// Get the orders for the user
 	rows, err := db.pool.Query(ctx, "SELECT order_number, status, accrual, uploaded_at FROM orders WHERE user_id = $1 ORDER BY uploaded_at DESC", userID)
@@ -156,9 +156,9 @@ func (db *DB) GetOrders(ctx context.Context, userID int64) ([]*models.Order, err
 	}
 	defer rows.Close()
 	// Get the orders
-	orders := []*models.Order{}
+	orders := []models.Order{}
 	for rows.Next() {
-		order := &models.Order{}
+		order := models.Order{}
 		// Scan the order
 		var accrual *float64
 		err := rows.Scan(&order.Number, &order.Status, &accrual, &order.UploadedAt)
@@ -185,7 +185,7 @@ func (db *DB) GetBalance(ctx context.Context, userID int64) (*models.Balance, er
 	}
 	defer func() {
 		if err := tx.Rollback(ctx); err != nil && err != pgx.ErrTxClosed {
-			db.logger.Errorf("failed to rollback a transaction: %w", err)
+			db.logger.Errorf("failed to rollback a transaction: %v", err)
 		}
 	}()
 	// Get the balance
@@ -203,8 +203,8 @@ func (db *DB) loadBalance(ctx context.Context, tx pgx.Tx, userID int64) (*models
 
 	// Get the balance for the user
 	balance := &models.Balance{}
-	var accrual *float64
-	var withdrawn *float64
+	var accrual float64
+	var withdrawn float64
 
 	// Get the withdrawn sum within transaction
 	err := tx.QueryRow(ctx, "SELECT COALESCE(SUM(summ), 0) FROM withdrawals WHERE user_id = $1", userID).Scan(&withdrawn)
@@ -217,14 +217,10 @@ func (db *DB) loadBalance(ctx context.Context, tx pgx.Tx, userID int64) (*models
 	if err != nil {
 		return nil, fmt.Errorf("failed to get accrual sum: %w", err)
 	}
-	// If the withdrawn sum is not nil, set the withdrawn sum
-	if withdrawn != nil {
-		balance.Withdrawn = *withdrawn
-	}
-	// If the accrual sum is not nil, set the accrual sum
-	if accrual != nil {
-		balance.Current = *accrual - balance.Withdrawn
-	}
+
+	// Set the balance values
+	balance.Withdrawn = withdrawn
+	balance.Current = accrual - balance.Withdrawn
 
 	return balance, nil
 }
@@ -239,16 +235,13 @@ func (db *DB) Withdraw(ctx context.Context, withdrawal *models.Withdrawal) error
 	}
 	defer func() {
 		if err := tx.Rollback(ctx); err != nil && err != pgx.ErrTxClosed {
-			db.logger.Errorf("failed to rollback a transaction: %w", err)
+			db.logger.Errorf("failed to rollback a transaction: %v", err)
 		}
 	}()
 
-	// Lock tables within the transaction to prevent race conditions
-	if _, err := tx.Exec(ctx, "LOCK TABLE orders IN EXCLUSIVE MODE"); err != nil {
-		return fmt.Errorf("failed to lock orders table: %w", err)
-	}
-	if _, err := tx.Exec(ctx, "LOCK TABLE withdrawals IN EXCLUSIVE MODE"); err != nil {
-		return fmt.Errorf("failed to lock withdrawals table: %w", err)
+	// Acquire an advisory lock for the user for the duration of the transaction
+	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", withdrawal.UserID); err != nil {
+		return fmt.Errorf("failed to acquire advisory lock for user %d: %w", withdrawal.UserID, err)
 	}
 
 	// Check if the balance is enough using transaction-aware GetBalance
@@ -278,7 +271,7 @@ func (db *DB) Withdraw(ctx context.Context, withdrawal *models.Withdrawal) error
 }
 
 // GetWithdrawals gets the withdrawals for the user and returns them.
-func (db *DB) GetWithdrawals(ctx context.Context, userID int64) ([]*models.Withdrawal, error) {
+func (db *DB) GetWithdrawals(ctx context.Context, userID int64) ([]models.Withdrawal, error) {
 	db.logger.Debugf("Getting withdrawals for user %d", userID)
 
 	// Get the withdrawals for the user
@@ -288,11 +281,11 @@ func (db *DB) GetWithdrawals(ctx context.Context, userID int64) ([]*models.Withd
 	}
 	defer rows.Close()
 	// Get the withdrawals
-	withdrawals := []*models.Withdrawal{}
+	withdrawals := []models.Withdrawal{}
 
 	for rows.Next() {
 		// Scan the withdrawal
-		withdrawal := &models.Withdrawal{}
+		withdrawal := models.Withdrawal{}
 		err := rows.Scan(&withdrawal.Order, &withdrawal.Sum, &withdrawal.ProcessedAt)
 		if err != nil {
 			return nil, err
@@ -306,7 +299,7 @@ func (db *DB) GetWithdrawals(ctx context.Context, userID int64) ([]*models.Withd
 
 // -------Methods for accrual service-------
 // GetUnprocessedOrders gets the unprocessed orders and returns them.
-func (db *DB) GetUnprocessedOrders(ctx context.Context) ([]*models.Order, error) {
+func (db *DB) GetUnprocessedOrders(ctx context.Context) ([]models.Order, error) {
 	db.logger.Debug("Getting unprocessed orders")
 	// Get the unprocessed orders
 	rows, err := db.pool.Query(ctx, `
@@ -318,7 +311,7 @@ func (db *DB) GetUnprocessedOrders(ctx context.Context) ([]*models.Order, error)
 	}
 	defer rows.Close()
 	// Get the unprocessed orders
-	orders := []*models.Order{}
+	orders := []models.Order{}
 	// Scan the orders
 	for rows.Next() {
 		var o models.Order
@@ -326,7 +319,7 @@ func (db *DB) GetUnprocessedOrders(ctx context.Context) ([]*models.Order, error)
 			return nil, fmt.Errorf("scan order: %w", err)
 		}
 		// Append the order to the list
-		orders = append(orders, &o)
+		orders = append(orders, o)
 	}
 	return orders, nil
 }

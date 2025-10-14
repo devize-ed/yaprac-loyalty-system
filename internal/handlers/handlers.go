@@ -19,9 +19,9 @@ type Storage interface {
 	CreateUser(ctx context.Context, user *models.User) (int64, error)
 	GetUser(ctx context.Context, login string) (*models.User, error)
 	CreateOrder(ctx context.Context, order *models.Order) error
-	GetOrders(ctx context.Context, userID int64) ([]*models.Order, error)
+	GetOrders(ctx context.Context, userID int64) ([]models.Order, error)
 	GetBalance(ctx context.Context, userID int64) (*models.Balance, error)
-	GetWithdrawals(ctx context.Context, userID int64) ([]*models.Withdrawal, error)
+	GetWithdrawals(ctx context.Context, userID int64) ([]models.Withdrawal, error)
 	Withdraw(ctx context.Context, withdrawal *models.Withdrawal) error
 }
 
@@ -168,7 +168,7 @@ func (h *Handler) CreateOrder() http.HandlerFunc {
 		orderNumber, err := io.ReadAll(r.Body)
 		if err != nil {
 			h.logger.Error("failed to read order number: ", err)
-			http.Error(w, "Failed to read order number", http.StatusInternalServerError)
+			http.Error(w, "Failed to read order number", http.StatusBadRequest)
 			return
 		}
 		// Check if the order number is valid

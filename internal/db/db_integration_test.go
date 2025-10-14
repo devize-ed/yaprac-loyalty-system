@@ -397,16 +397,14 @@ func TestDB_GetUnprocessedOrders(t *testing.T) {
 
 	cases := []struct {
 		Name string
-		want []*models.Order
+		want []models.Order
 	}{
 		{
 			Name: "get_unprocessed_orders",
-			want: []*models.Order{
-				{
-					Number: "1234567890",
-					Status: "NEW",
-				},
-			},
+			want: []models.Order{{
+				Number: "1234567890",
+				Status: "NEW",
+			}},
 		},
 	}
 

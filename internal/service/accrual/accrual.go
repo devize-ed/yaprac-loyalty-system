@@ -20,7 +20,7 @@ import (
 
 // Storage interface for the accrual service
 type Storage interface {
-	GetUnprocessedOrders(ctx context.Context) ([]*models.Order, error)
+	GetUnprocessedOrders(ctx context.Context) ([]models.Order, error)
 	UpdateOrder(ctx context.Context, order *models.Order) error
 }
 
