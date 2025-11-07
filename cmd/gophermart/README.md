@@ -1,4 +1,4 @@
-# cmd/gophermart
+## cmd/gophermart
 
-В данной директории будет содержаться код накопительной системы лояльности, который скомпилируется в бинарное
-приложение.
+Application entrypoint, starts HTTP server and background accrual service.
+
